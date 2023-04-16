@@ -29,6 +29,7 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
         "HTTP/1.1 200 OK\n"
         "Content-Type: text/html\n"
         "Connection: close\n"
+        "\n"
         "<html><head><title>Well done!</title></head>\n"
         "<body>This page is served over TLS with the private key guarded by a TPM!</body></html>\n";
     char msg[MAX_MSG_SZ];
