@@ -6,6 +6,12 @@ This repo contains the code used in the practical assignment of the HW/SW securi
 
 The code should build pretty much everywhere, but has only been tested specifically for the workshop with the supplied makefiles on Raspberry Pi using the instructions below.
 
+### Platform
+
+Tested on Raspberry Pi 3 with Raspberry OS Lite (32-bit).
+
+Make sure the TPM is correctly installed and the device shows up as `/dev/tpm0`. For example, run `sudo tpm2_getrandom 10 --hex` to verify communication with the TPM works.
+
 ### Dependencies
 
 Start by installing some additional packages:
@@ -30,7 +36,7 @@ Build and install WolfTPM:
 
 ```sh
 git clone https://github.com/wolfSSL/wolfTPM.git
-cd wolTPM
+cd wolfTPM
 ./autogen.sh
 ./configure --enable-devtpm # (optional: --enable-debug)
 make
@@ -41,7 +47,7 @@ sudo ldconfig
 Build the tools in this repository:
 
 ```sh
-git clone git@github.com:stenverbois/tpm-demo.git
+git clone https://github.com/stenverbois/tpm-demo.git
 cd tpm-demo
 make
 ```
