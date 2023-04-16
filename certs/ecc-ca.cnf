@@ -1,0 +1,62 @@
+[ ca ]
+default_ca = DefaultCA
+
+[ DefaultCA ]
+serial        = ./certs/serial
+database      = ./certs/index.txt
+new_certs_dir = ./certs
+certs         = ./certs
+
+certificate = ./certs/ca-ecc-cert.pem
+private_key = ./certs/ca-ecc-key.pem
+
+
+default_md = sha1
+
+default_days = 365
+
+x509_extensions = v3_ca
+
+# a section with a set of variables corresponding to DN fields
+policy = loose
+
+[ loose ]
+countryName            = optional
+stateOrProvinceName    = optional
+localityName           = optional
+organizationName       = optional
+organizationalUnitName = optional
+commonName             = supplied
+emailAddress           = optional
+
+[ v3_ca ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer
+basicConstraints       = critical, CA:true
+keyUsage               = critical, digitalSignature, cRLSign, keyCertSign
+
+[ req ]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+string_mask        = utf8only
+
+[ req_distinguished_name ]
+countryName             = NL
+stateOrProvinceName     = Noord-Brabant
+localityName            = 's-Hertogenbosch
+0.organizationName      = DemoOrg
+organizationalUnitName  = TPM Demo
+commonName              = TPM Demo CA
+
+[ server_cert ]
+basicConstraints       = CA:FALSE
+nsCertType             = server
+subjectKeyIdentifier   = hash
+subjectAltName         = @alternate_names
+authorityKeyIdentifier = keyid,issuer:always
+keyUsage               = critical, digitalSignature, keyEncipherment, keyAgreement
+extendedKeyUsage       = serverAuth
+
+[ alternate_names ]
+DNS.1 = raspberrypi.local
+DNS.2 = raspberrypi

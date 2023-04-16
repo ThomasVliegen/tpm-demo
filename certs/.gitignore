@@ -1,0 +1,6 @@
+index*
+serial
+*.old
+*.pem
+*.der
+*.csr
