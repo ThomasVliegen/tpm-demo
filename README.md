@@ -11,7 +11,7 @@ The code should build pretty much everywhere, but has only been tested specifica
 Start by installing some additional packages:
 
 ```sh
-sudo apt-get install vim git libtools automake tpm2-tools
+sudo apt-get install vim git libtool automake tpm2-tools
 ```
 
 Build and install WolfSSL:
