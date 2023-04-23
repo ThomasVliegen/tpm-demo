@@ -95,7 +95,7 @@ This opens a webserver running on port `11111`. Now perform a request to this se
 
 _Exercise: Why do these tools warn you about this connection?_
 
-_Exercise: Using Wireshark, find the point in the TLS hasdshake where this certificate is exchanged. Can you find the public key information in this certificate. Compare this public key to the one we created in the TPM. (Hint: `tpm2-tools` has some useful tools to interact with the TPM)_
+_Exercise: Using Wireshark, find the point in the TLS handshake where this certificate is exchanged. Can you find the public key information in this certificate. Compare this public key to the one we created in the TPM. (Hint: `tpm2-tools` has some useful tools to interact with the TPM)_
 
 _Exercise: Can you make your client (Postman or browser) trust this connection and not display a security warning?_
 
