@@ -22,4 +22,4 @@ plain_http_server:
 	@O=$(O) $(MAKE) -C $@
 
 clean:
-	rm $(TARGET)
+	rm -rf $(O)

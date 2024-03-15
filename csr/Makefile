@@ -6,7 +6,7 @@ O ?= build/
 TARGET=csr
 SOURCES=main.c
 
-.PHONY: all clean install
+.PHONY: all clean
 
 all:
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES) -I.. $(LDLIBS)
@@ -15,4 +15,4 @@ all:
 	@mv $(TARGET) $(O)/
 
 clean:
-	rm $(O)/$(TARGET)
+	rm -rf $(O)
