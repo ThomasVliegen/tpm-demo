@@ -11,6 +11,8 @@
 
 #include <stdio.h>
 
+#include <netdb.h>
+
 /* TLS Configuration */
 #ifndef TLS_HOST
     #define TLS_HOST "localhost"
