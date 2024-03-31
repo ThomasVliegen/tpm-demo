@@ -5,7 +5,7 @@ O ?= build/
 TARGET=plain_http_server
 SOURCES=main.c
 
-.PHONY: all clean install
+.PHONY: all clean
 
 all:
 	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCES)
@@ -14,4 +14,4 @@ all:
 	@mv $(TARGET) $(O)/
 
 clean:
-	rm $(O)/$(TARGET)
+	rm -rf $(O)
