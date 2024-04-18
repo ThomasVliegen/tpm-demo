@@ -60,3 +60,4 @@ extendedKeyUsage       = serverAuth
 [ alternate_names ]
 DNS.1 = raspberrypi.local
 DNS.2 = raspberrypi
+DNS.3 = raspberrypi-thovli
