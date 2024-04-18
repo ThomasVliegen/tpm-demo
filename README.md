@@ -23,10 +23,10 @@ sudo apt-get install vim git libtool automake tpm2-tools
 Build and install WolfSSL:
 
 ```sh
-git clone https://github.com/wolfSSL/wolfssl.git
+git clone --branch=v5.6.0-stable https://github.com/wolfSSL/wolfssl.git
 cd wolfssl
-./autogen.sh
-./configure --enable-certgen --enable-certreq --enable-certext --enable-pkcs7 --enable-cryptocb --enable-aescfb
+sudo ./autogen.sh
+sudo ./configure --enable-certgen --enable-certreq --enable-certext --enable-pkcs7 --enable-cryptocb --enable-aescfb
 make
 sudo make install
 sudo ldconfig
@@ -35,10 +35,10 @@ sudo ldconfig
 Build and install WolfTPM:
 
 ```sh
-git clone https://github.com/wolfSSL/wolfTPM.git
+git clone --branch=v2.7.0 https://github.com/wolfSSL/wolfTPM.git
 cd wolfTPM
-./autogen.sh
-./configure --enable-devtpm # (optional: --enable-debug)
+sudo ./autogen.sh
+sudo ./configure --enable-devtpm # (optional: --enable-debug)
 make
 sudo make install
 sudo ldconfig
@@ -47,7 +47,7 @@ sudo ldconfig
 Build the tools in this repository:
 
 ```sh
-git clone https://github.com/stenverbois/tpm-demo.git
+git clone https://github.com/ThomasVliegen/tpm-demo.git
 cd tpm-demo
 make
 ```
