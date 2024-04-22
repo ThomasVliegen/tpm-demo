@@ -35,8 +35,7 @@ sudo ldconfig
 Build and install WolfTPM:
 
 ```sh
-git clone --branch=46631afecdab10dc1994b85d0e203eaf0889cbaf https://github.com/wolfSSL/wolfTPM.git
-#git clone --branch=v2.7.0 https://github.com/wolfSSL/wolfTPM.git
+git clone --branch=v3.0.0 https://github.com/wolfSSL/wolfTPM.git
 cd wolfTPM
 sudo ./autogen.sh
 sudo ./configure --enable-devtpm # (optional: --enable-debug)
