@@ -27,7 +27,7 @@ git clone --branch=v5.6.0-stable https://github.com/wolfSSL/wolfssl.git
 cd wolfssl
 sudo ./autogen.sh
 sudo ./configure --enable-certgen --enable-certreq --enable-certext --enable-pkcs7 --enable-cryptocb --enable-aescfb
-make
+sudo make
 sudo make install
 sudo ldconfig
 ```
@@ -35,11 +35,12 @@ sudo ldconfig
 Build and install WolfTPM:
 
 ```sh
-git clone --branch=v2.7.0 https://github.com/wolfSSL/wolfTPM.git
+git clone --branch=46631afecdab10dc1994b85d0e203eaf0889cbaf https://github.com/wolfSSL/wolfTPM.git
+#git clone --branch=v2.7.0 https://github.com/wolfSSL/wolfTPM.git
 cd wolfTPM
 sudo ./autogen.sh
 sudo ./configure --enable-devtpm # (optional: --enable-debug)
-make
+sudo make
 sudo make install
 sudo ldconfig
 ```
@@ -49,7 +50,7 @@ Build the tools in this repository:
 ```sh
 git clone https://github.com/ThomasVliegen/tpm-demo.git
 cd tpm-demo
-make
+sudo make
 ```
 
 ## Part 1: Running an insecure HTTP server
