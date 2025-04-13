@@ -2,23 +2,73 @@
 
 This repo contains the code used in the practical assignment of the HW/SW security workshop.
 
-## Building
+## Compatibility
 
-The code should build pretty much everywhere, but has only been tested specifically for the workshop with the supplied makefiles on Raspberry Pi using the instructions below.
+The code should build pretty much everywhere, however it's only been tested specifically for the workshop with the supplied makefiles on Raspberry Pi 3 Model B+ with Raspberry OS Lite (32-bit).
 
-### Platform
+The [LetsTrust-TPM](https://letstrust.de) is used as Trusted Platform Module to safely store cryptographic keys.
 
-Tested on Raspberry Pi 3 with Raspberry OS Lite (32-bit).
-
-Make sure the TPM is correctly installed and the device shows up as `/dev/tpm0`. For example, run `sudo tpm2_getrandom 10 --hex` to verify communication with the TPM works.
-
-### Dependencies
-
-Start by installing some additional packages:
-
+Some packages are used in this demo, these can be installed by running:
 ```sh
 sudo apt-get install vim git libtool automake tpm2-tools
 ```
+
+### Installing TPM
+
+First, make sure the TPM is connected to your Raspberry Pi.
+
+The LetsTrust TPM module is supported directly by Linux, starting with Kernel 4.14.85
+The TPM can be activated as `/dev/tpm0` as follows:
+
+Edit the Raspberry Pi configuration by running:
+```sh
+sudo nano /boot/firmware/config.txt
+```
+
+Add these two lines:
+```sh
+dtparam=spi=on
+dtoverlay=tpm-slb9670 
+```
+
+Finally reboot the Pi by running:
+```sh
+sudo reboot
+```
+
+Make sure the TPM is correctly installed and the device shows up as `/dev/tpm0`. You can verify communication with the TPM by running `sudo tpm2_getrandom 10 --hex`.
+
+## Structure 
+
+This assignment consists out of 3 parts. You will start by running an insecure HTTP server in part 1. Next, you will generate a certificate for your server in part 2 and finally the generated certificate is used in part 3 to run a secure HTTPS server.
+
+- Part 1: run insecure HTTP server
+- Part 2: generate server certificate
+- Part 3: run secure HTTPS server
+
+## Part 1: Running an insecure HTTP server
+
+Clone the repository to your Pi:
+```sh
+git clone https://github.com/ThomasVliegen/tpm-demo.git
+```
+From your demo-tpm directory, build the http server by running:
+```sh
+make http_server
+```
+Next run the HTTP server using:
+```sh
+./build/http_server
+```
+
+This opens a webserver listening on port `11111`. Now perform a request to this server using your browser.
+
+_Exercise: Can you intercept and read the response in plain text on the network using Wireshark?_
+
+
+## TLS Dependencies
+
+Part 2 & 3 use the WolfSSL and WolfTPM libraries. Go to your home directory (`cd ~`) to build and install these libraries.
 
 Build and install WolfSSL:
 
@@ -44,32 +94,13 @@ sudo make install
 sudo ldconfig
 ```
 
-Build the tools in this repository:
-
-```sh
-git clone https://github.com/ThomasVliegen/tpm-demo.git
-cd tpm-demo
-sudo make
-```
-
-## Part 1: Running an insecure HTTP server
-
-From your demo-tpm checkout, run the HTTP server without any security using:
-```sh
-./build/plain_http_server
-```
-
-This opens a webserver listening on port `11111`. Now perform a request to this server using Postman or your browser.
-
-_Exercise: Can you intercept and read the response in plain text on the network using Wireshark?_
-
 ## Part 2: Setting up the TPM and certificates
 
 First of all, we need to generate a keypair on the TPM. Since only the TPM has access to the private key, we need to ask it to create a Certificate Signing Request (CSR) for us that we can send to a CA.
 
-The `csr` tool creates a persistent key for you on index `0x81008123` if there does not exist any yet.
-
+The `csr` tool creates a persistent key for you on index `0x81008123` if there does not exist any yet. Build and run the `csr` tool by running:
 ```sh
+sudo make csr
 sudo ./build/csr
 ```
 
@@ -85,9 +116,10 @@ We will use `ca-ecc-cert.pem` as the CA certificate and `server-ecc-cert.pem` as
 
 ## Part 3: Running a secure TLS server
 
-Now we can run a TLS server that uses `server-ecc-cert.pem` to set up a TLS session.
+Now we can run a TLS server that uses `server-ecc-cert.pem` to set up a TLS session. Build and run the TLS server by running:
 
 ```sh
+sudo make tls_server
 sudo ./build/tls_server
 ```
 
@@ -102,5 +134,3 @@ _Exercise: Can you make your client (Postman or browser) trust this connection a
 ## License
 
 This repository makes use of the examples provided by [WolfSSL/WolfTPM](https://github.com/wolfSSL) distributed under the GPLv2 license.
-
-This repository makes use of [tiny-web-server](https://github.com/shenfeng/tiny-web-server) distributed under the MIT license.

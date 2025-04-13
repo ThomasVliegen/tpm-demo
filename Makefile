@@ -1,25 +1,18 @@
-CC=gcc
-CFLAGS=-std=c11 -Wall
-LDLIBS=-lwolftpm -lwolfssl -lm -pthread
+BUILD_DIR = $(shell realpath ./build/)
 
-TARGET=tls_server
-SOURCES=main.c tpm_test_keys.c
-INCLUDES=.
+.PHONY: all clean http_server csr tls_server
 
-O = $(shell realpath ./build/)
+all: http_server csr tls_server
 
-.PHONY: all clean csr tls_server plain_http_server
-
-all: csr tls_server plain_http_server
+http_server:
+	@BUILD_DIR=$(BUILD_DIR) $(MAKE) -C $@
 
 csr:
-	@O=$(O) $(MAKE) -C $@
+	@O=$(BUILD_DIR) $(MAKE) -C $@
 
 tls_server:
-	@O=$(O) $(MAKE) -C $@
-
-plain_http_server:
-	@O=$(O) $(MAKE) -C $@
+	@O=$(BUILD_DIR) $(MAKE) -C $@
 
 clean:
-	rm -rf $(O)
+	@echo [RM] $(BUILD_DIR)
+	@rm -rf $(BUILD_DIR)
