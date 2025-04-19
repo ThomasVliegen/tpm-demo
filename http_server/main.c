@@ -1,4 +1,6 @@
 #include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/time.h>
 #include <signal.h>
 #include <errno.h>
 #include <stdio.h>
@@ -19,6 +21,7 @@ static void process(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_page(int32_t fd, struct sockaddr_in* clientaddr, const char* page, const char* status_code);
 static void send_not_found_page(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_unauthorized_page(int32_t fd, struct sockaddr_in* clientaddr);
+static void send_bad_request_page(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_response(int32_t fd, void* usrbuf, size_t n);
 static void handle_login(int32_t client_sock, struct sockaddr_in* clientaddr, char* body);
 static const char* read_file();
@@ -73,7 +76,7 @@ static void process(int32_t fd, struct sockaddr_in* clientaddr){
             char *body = strstr(request_buffer, "\r\n\r\n") + 4;
             handle_login(fd, clientaddr, body);
         } else {
-            send_not_found_page(fd, clientaddr);
+            send_bad_request_page(fd, clientaddr);
         }
     }
     close(fd);
@@ -105,6 +108,13 @@ static void send_unauthorized_page(int32_t fd, struct sockaddr_in* clientaddr)
 {
     const char* status_code = "401 Unauthorized";
     const char* response_buf = "<html><body><h1>401 Unauthorized</h1></body></html>";
+    send_page(fd, clientaddr, response_buf, status_code);
+}
+
+static void send_bad_request_page(int32_t fd, struct sockaddr_in* clientaddr)
+{
+    const char* status_code = "400 Bad Request";
+    const char* response_buf = "<html><body><h1>400 Bad Request</h1></body></html>";
     send_page(fd, clientaddr, response_buf, status_code);
 }
 
@@ -196,6 +206,7 @@ int32_t main(int32_t argc, char** argv){
     socklen_t clientlen = sizeof clientaddr;
     int32_t default_port = 11111;
     int32_t listenfd, connfd;
+    struct timeval timeout = {.tv_usec = 250000};
 
     listenfd = open_listenfd(default_port);
     if (listenfd > 0) {
@@ -210,6 +221,7 @@ int32_t main(int32_t argc, char** argv){
 
     while(1){
         connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
+        setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
         process(connfd, &clientaddr);
     }
 
