@@ -41,16 +41,14 @@ int GetPrimaryECCKey(WOLFTPM2_DEV* pDev,
             // Make key persistent
             rc = wolfTPM2_NVStoreKey(pDev, TPM_RH_OWNER, key, sPrimaryEccKeyIndex);
         }
-
-
+    }
+    else
+    {
+        printf("An existing key was found at index 0x%x.\n", sPrimaryEccKeyIndex);
     }
 
     if (rc != TPM_RC_SUCCESS)
-    {
         return rc;
-    }
-
-    printf("An existing key was found at index 0x%x.\n", sPrimaryEccKeyIndex);
 
     if (pWolfEccKey) {
         /* setup wolf ECC key with TPM deviceID, so crypto callbacks are used */

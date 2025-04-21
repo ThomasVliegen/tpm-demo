@@ -13,21 +13,6 @@
 
 #include <netdb.h>
 
-/* TLS Configuration */
-#ifndef TLS_HOST
-    #define TLS_HOST "localhost"
-#endif
-#ifndef TLS_PORT
-    #define TLS_PORT 11111
-#endif
-
-#ifndef MAX_MSG_SZ
-    #define MAX_MSG_SZ   (1 * 1024)
-#endif
-#ifndef TOTAL_MSG_SZ
-    #define TOTAL_MSG_SZ (16 * 1024)
-#endif
-
 typedef struct SockIoCbCtx {
     int listenFd;
     int fd;

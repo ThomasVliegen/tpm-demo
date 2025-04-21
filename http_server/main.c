@@ -28,7 +28,7 @@ static void send_unauthorized_page(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_bad_request_page(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_response(int32_t fd, void* usrbuf, size_t n);
 static void handle_login(int32_t client_sock, struct sockaddr_in* clientaddr, char* body);
-static const char* read_file();
+static const char* read_file(const char *filename);
 
 static int32_t open_listenfd(int32_t port){
     int32_t listenfd, optval=1;

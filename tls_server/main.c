@@ -10,43 +10,193 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <signal.h>
+
+#define TLS_PORT 11111
+#define RSP_BUFFER_SIZE (int32_t) 8192      /* max length of a line */
+#define RCV_BUFFER_SIZE (int32_t) 1024
+#define USERNAME "admin"
+#define PASSWORD "password123"
+
+// function declarations
+static void process(WOLFSSL* ssl);
+static void send_page(WOLFSSL* ssl, const char* page, const char* status_code);
+static void send_not_found_page(WOLFSSL* ssl);
+static void send_unauthorized_page(WOLFSSL* ssl);
+static void send_bad_request_page(WOLFSSL* ssl);
+static int send_response(WOLFSSL* ssl, void* usrbuf, size_t n);
+static void handle_login(WOLFSSL* ssl, char* body);
+static const char* read_file(const char *filename);
+
+static void process(WOLFSSL* ssl)
+{
+    char request_buffer[RCV_BUFFER_SIZE];
+    int rc = 0;
+    do
+    {
+        rc = wolfSSL_read(ssl, request_buffer, sizeof(request_buffer));
+        if (rc < 0)
+        {
+            rc = wolfSSL_get_error(ssl, 0);
+        }
+    } while (rc == WOLFSSL_ERROR_WANT_READ);
+    
+    if (rc > 0) {
+        const int32_t request_size = rc;
+        request_buffer[request_size] = '\0';
+        printf("Read (%d): %s\n", request_size, request_buffer);
+        if (strstr(request_buffer, "GET /") != NULL) {
+            const char *content = read_file("http_server/pages/login.html");
+            if (content == NULL)
+                send_not_found_page(ssl);
+            else
+                send_page(ssl, content, "200 OK");
+            free((char *)content);   
+        } else if (strstr(request_buffer, "POST /login") != NULL) {
+            printf("login request received\n");
+            // Find the start of the body
+            char *body = strstr(request_buffer, "\r\n\r\n") + 4;
+            handle_login(ssl, body);
+        } else {
+            send_bad_request_page(ssl);
+        }
+    }
+}
+
+static void send_page(WOLFSSL* ssl, const char* content, const char* status_code)
+{
+    char response_buf[RSP_BUFFER_SIZE];
+    size_t content_length = strlen(content);
+    snprintf(response_buf, sizeof(response_buf), 
+            "HTTP/1.1 %s\r\n"
+            "Content-Type: text/html\r\n"
+            "Connection: close\r\n"
+            "Content-Length: %zu\r\n"
+            "\r\n"
+            "%s", status_code, content_length, content);
+    send_response(ssl, response_buf, sizeof(response_buf));
+}
+
+static void send_not_found_page(WOLFSSL* ssl)
+{
+    const char* status_code = "404 Not Found";
+    const char* response_buf = "<html><body><h1>404 Not Found</h1></body></html>";
+    send_page(ssl, response_buf, status_code);
+}
+
+static void send_unauthorized_page(WOLFSSL* ssl)
+{
+    const char* status_code = "401 Unauthorized";
+    const char* response_buf = "<html><body><h1>401 Unauthorized</h1></body></html>";
+    send_page(ssl, response_buf, status_code);
+}
+
+static void send_bad_request_page(WOLFSSL* ssl)
+{
+    const char* status_code = "400 Bad Request";
+    const char* response_buf = "<html><body><h1>400 Bad Request</h1></body></html>";
+    send_page(ssl, response_buf, status_code);
+}
+
+static int send_response(WOLFSSL* ssl, void* usrbuf, size_t n)
+{
+    int rc = 0;
+    do
+    {
+        rc = wolfSSL_write(ssl, usrbuf, n);
+        if (rc != n) {
+            rc = wolfSSL_get_error(ssl, 0);
+        }
+    } while (rc == WOLFSSL_ERROR_WANT_WRITE);
+    return rc;
+}
+
+static void handle_login(WOLFSSL* ssl, char *body) {
+    char username[128] = {0}, password[128] = {0};
+
+    sscanf(body, "username=%127[^&]&password=%127s", username, password);
+    printf("Received:\nUsername: %s\nPassword: %s\n", username, password);
+
+    // Check credentials
+    if (strcmp(username, USERNAME) == 0 && strcmp(password, PASSWORD) == 0) {
+        const char *content = read_file("http_server/pages/dashboard.html");
+        if (content == NULL)
+            send_not_found_page(ssl);
+        else
+            send_page(ssl, content, "200 OK");
+        free((char *)content);
+    } else {
+        send_unauthorized_page(ssl);
+    }
+}
+
+static const char *read_file(const char *filename)
+{
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL)
+    {
+        perror("Unable to open file");
+        return NULL;
+    }
+
+    if (fseek(file, 0, SEEK_END) != 0)
+    {
+        perror("Unable to find end of file");
+        fclose(file);
+        return NULL;
+    }
+
+    long filesize = ftell(file);
+    if (filesize == -1)
+    {
+        perror("Unable to determine filesize");
+        rewind(file);
+        fclose(file);
+        return NULL;
+    }
+    rewind(file);
+
+    char *buffer = (char *)malloc((filesize + 1) * sizeof(char));
+    if (buffer == NULL)
+    {
+        perror("Unable to allocate memory");
+        fclose(file);
+        return NULL;
+    }
+
+    if ((long)fread(buffer, 1, filesize, file) < filesize)
+    {
+        fprintf(stderr, "Error: Failed to read file\n");
+        fclose(file);
+        return NULL;
+    }
+
+    buffer[filesize] = '\0';
+
+    fclose(file);
+    return buffer;
+}
 
 int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *argv[])
 {
     int rc;
-    WOLFTPM2_DEV dev;
-    WOLFTPM2_KEY storageKey;
+    WOLFTPM2_DEV dev = {0};
+    WOLFTPM2_KEY storageKey = {0};
 
-    WOLFTPM2_KEY eccKey;
-    ecc_key wolfEccKey;
+    WOLFTPM2_KEY eccKey = {0};
+    ecc_key wolfEccKey = {0};
 
-    TpmCryptoDevCtx tpmCtx;
-    SockIoCbCtx sockIoCtx;
+    TpmCryptoDevCtx tpmCtx = {0};
+    SockIoCbCtx sockIoCtx = {0};
     int tpmDevId;
     WOLFSSL_CTX* ctx = NULL;
     WOLFSSL* ssl = NULL;
-    const char webServerMsg[] =
-        "HTTP/1.1 200 OK\n"
-        "Content-Type: text/html\n"
-        "Connection: close\n"
-        "\n"
-        "<html><head><title>Well done!</title></head>\n"
-        "<body>This page is served over TLS with the private key guarded by a TPM!</body></html>\n";
-    char msg[MAX_MSG_SZ];
-    int msgSz = 0;
-    WOLFTPM2_SESSION tpmSession;
+
+    WOLFTPM2_SESSION tpmSession = {0};
     TPMT_PUBLIC publicTemplate;
 
     // Initialize
-    XMEMSET(&storageKey, 0, sizeof(storageKey));
-    XMEMSET(&sockIoCtx, 0, sizeof(sockIoCtx));
     sockIoCtx.fd = -1;
-    XMEMSET(&tpmCtx, 0, sizeof(tpmCtx));
-
-    XMEMSET(&eccKey, 0, sizeof(eccKey));
-    XMEMSET(&wolfEccKey, 0, sizeof(wolfEccKey));
-
-    XMEMSET(&tpmSession, 0, sizeof(tpmSession));
 
     // Initialize TPM context
     rc = wolfTPM2_Init(&dev, TPM2_IoCb, userCtx);
@@ -61,10 +211,6 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     tpmCtx.storageKey = &storageKey;
     rc = wolfTPM2_SetCryptoDevCb(&dev, wolfTPM2_CryptoDevCb, &tpmCtx, &tpmDevId);
     if (rc != 0) goto exit;
-
-    /* See if primary storage key already exists */
-    // rc = getPrimaryStoragekey(&dev, &storageKey, TPM_ALG_RSA);
-    // if (rc != 0) goto exit;
 
     /* Create/Load ECC key for TLS authentication */
     rc = wolfTPM2_GetKeyTemplate_ECC(&publicTemplate,
@@ -148,66 +294,30 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     	rc = SocketWaitClient(&sockIoCtx);
     	if (rc != 0) goto cleanup;
 
-        // Accept connection
-        do
-        {
-            rc = wolfSSL_accept(ssl);
-            if (rc != WOLFSSL_SUCCESS)
-            {
-                rc = wolfSSL_get_error(ssl, 0);
-            }
-        } while (rc == WOLFSSL_ERROR_WANT_READ || rc == WOLFSSL_ERROR_WANT_WRITE);
+      // Accept connection
+      do
+      {
+          rc = wolfSSL_accept(ssl);
+          if (rc != WOLFSSL_SUCCESS)
+          {
+              rc = wolfSSL_get_error(ssl, 0);
+          }
+      } while (rc == WOLFSSL_ERROR_WANT_READ || rc == WOLFSSL_ERROR_WANT_WRITE);
 
         if (rc != WOLFSSL_SUCCESS) goto cleanup;
 
-        // Read request
-        do
-        {
-            rc = wolfSSL_read(ssl, msg, sizeof(msg));
-            if (rc < 0)
-            {
-                rc = wolfSSL_get_error(ssl, 0);
-            }
-        } while (rc == WOLFSSL_ERROR_WANT_READ);
-
-        if (rc >= 0)
-        {
-            msgSz = rc;
-            /* null terminate */
-            if (msgSz >= (int)sizeof(msg))
-                msgSz = (int)sizeof(msg) - 1;
-            msg[msgSz] = '\0';
-            printf("Read (%d): %s\n", msgSz, msg);
-            rc = 0;
-        }
-        if (rc != 0) goto cleanup;
-
-        // Write response
-        msgSz = sizeof(webServerMsg);
-        XMEMCPY(msg, webServerMsg, msgSz);
-        do
-        {
-            rc = wolfSSL_write(ssl, msg, msgSz);
-            if (rc != msgSz) {
-                rc = wolfSSL_get_error(ssl, 0);
-            }
-        } while (rc == WOLFSSL_ERROR_WANT_WRITE);
-
-        if (rc >= 0)
-        {
-            msgSz =  rc;
-            printf("Write (%d): %s\n", msgSz, msg);
-            rc = 0;
-        }
+        // Process
+        process(ssl);
 
 cleanup:
+        printf("Cleanup reached!\n");
         wolfSSL_shutdown(ssl);
         wolfSSL_free(ssl);
         CloseAndCleanupSocket(&sockIoCtx);
     }
 
 exit:
-
+    printf("Exit reached!\n");
     if (rc != 0)
     {
         printf("Failure %d (0x%x): %s\n", rc, rc, wolfTPM2_GetRCString(rc));
@@ -228,6 +338,9 @@ exit:
 
 int main(int argc, char* argv[])
 {
+    // Ignore SIGPIPE signal, so if browser cancels the request, it
+    // won't kill the whole process.
+    signal(SIGPIPE, SIG_IGN);
     int rc;
 
     rc = TlsServer(NULL, argc, argv);
