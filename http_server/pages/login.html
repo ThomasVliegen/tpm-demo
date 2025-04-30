@@ -54,15 +54,26 @@
             background-color: #45a049;
         }
         .error-message {
-            display: none; /* Hidden by default */
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
             border-radius: 4px;
-            padding: 10px;
-            margin-top: 10px;
             font-size: 14px;
             text-align: center;
+            max-height: 0;
+            padding: 0px;
+            margin: 0px;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .error-message.show {
+            max-height: 200px;
+            padding: 10px;
+            margin-top: 10px;
+            opacity: 1;
+            transform: translateY(0);
         }
     </style>
 </head>
@@ -87,40 +98,49 @@
         <div class="error-message" id="errorMessageNotFound">
             <strong>Error:</strong> Server internal error, page not found.
         </div>
+        <div class="error-message" id="errorMessageGeneric">
+          <strong>Error:</strong> An unexpected error occurred. Please try again.
+      </div>
     </div>
 
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (event) => {
             event.preventDefault(); // Prevent the form from submitting the traditional way
             
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+            // Small delay to allow autofill values to be accessible
+            setTimeout(async () => {
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
 
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: new URLSearchParams({ username, password })
-                });
+                try {
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({ username, password })
+                    });
 
-                if (response.ok) {
-                    document.querySelectorAll('link[rel="stylesheet"], style').forEach(style => style.remove());
-                    document.body.innerHTML = await response.text(); // Replace the entire page content
-                } else if (response.status == 404) {
-                    document.getElementById('errorMessageCredentials').style.display = 'none';
-                    document.getElementById('errorMessageNotFound').style.display = 'block';
+                    if (response.ok) {
+                        document.querySelectorAll('link[rel="stylesheet"], style').forEach(style => style.remove());
+                        document.body.innerHTML = await response.text(); // Replace the entire page content
+                    } else if (response.status == 404) {
+                        document.getElementById('errorMessageCredentials').classList.remove('show');
+                        document.getElementById('errorMessageGeneric').classList.remove('show');
+                        document.getElementById('errorMessageNotFound').classList.add('show');
+                    }
+                    else {
+                        document.getElementById('errorMessageNotFound').classList.remove('show');
+                        document.getElementById('errorMessageGeneric').classList.remove('show');
+                        document.getElementById('errorMessageCredentials').classList.add('show');
+                    }
+                } catch (error) {
+                    console.error('An error occurred:', error);
+                    document.getElementById('errorMessageCredentials').classList.remove('show');
+                    document.getElementById('errorMessageNotFound').classList.remove('show');
+                    document.getElementById('errorMessageGeneric').classList.add('show');
                 }
-                else {
-                    document.getElementById('errorMessageCredentials').style.display = 'block';
-                    document.getElementById('errorMessageNotFound').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('An error occurred:', error);
-                document.getElementById('errorMessageNotFound').innerText = 'An unexpected error occurred. Please try again.';
-                document.getElementById('errorMessageNotFound').style.display = 'block';
-            }
+            }, 50); // Delay of 50 milliseconds
         });
     </script>
 
