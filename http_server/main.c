@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,7 +16,10 @@
 #define PASSWORD "password123"
 
 // function declarations
-int32_t open_listenfd(int32_t port);
+static int32_t open_listenfd(int32_t port);
+static int32_t get_content_length(const char *headers);
+static int32_t recv_request(int32_t fd, char *out_buffer, size_t max_size);
+static bool headers_complete(const char *buffer);
 static void log_access(const char* status_code, struct sockaddr_in* c_addr);
 static void process(int32_t fd, struct sockaddr_in* clientaddr);
 static void send_page(int32_t fd, struct sockaddr_in* clientaddr, const char* page, const char* status_code);
@@ -26,7 +30,7 @@ static void send_response(int32_t fd, void* usrbuf, size_t n);
 static void handle_login(int32_t client_sock, struct sockaddr_in* clientaddr, char* body);
 static const char* read_file();
 
-int32_t open_listenfd(int32_t port){
+static int32_t open_listenfd(int32_t port){
     int32_t listenfd, optval=1;
     struct sockaddr_in serveraddr;
 
@@ -52,16 +56,61 @@ int32_t open_listenfd(int32_t port){
     return listenfd;
 }
 
+static int32_t get_content_length(const char *headers) {
+    const char *cl = strstr(headers, "Content-Length:");
+    if (cl) {
+        cl += strlen("Content-Length:");
+        while (*cl == ' ') cl++; // skip spaces
+        if (*cl == '\0')
+          return 0;
+
+        char *endptr;
+        long len = strtol(cl, &endptr, 10);
+        if (endptr == cl || len < 0) return 0; // Invalid number
+    }
+}
+
+static int32_t recv_request(int32_t fd, char *out_buffer, size_t max_size)
+{
+  size_t total_received = 0;
+  size_t header_end_offset = 0;
+
+  while (!headers_complete(out_buffer)) {
+      ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
+      if (r <= 0) return 0; // error, timeout or connection closed
+      total_received += r;
+      out_buffer[total_received] = '\0';
+  }
+  char *header_end = strstr(out_buffer, "\r\n\r\n");
+  if (header_end == NULL) return 0;
+  header_end_offset = header_end - out_buffer + 4;
+
+  int32_t content_length = get_content_length(out_buffer);
+  while (total_received - header_end_offset < content_length) {
+      ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
+      if (r <= 0) return 0;
+      total_received += r;
+      out_buffer[total_received] = '\0';
+  }
+
+  return total_received;
+}
+
+static bool headers_complete(const char *buffer)
+{
+    return strstr(buffer, "\r\n\r\n") != NULL;
+}
+
 static void log_access(const char* status_code, struct sockaddr_in* c_addr){
     printf("%s:%d - %s\n", inet_ntoa(c_addr->sin_addr),
            ntohs(c_addr->sin_port), status_code);
 }
 
 static void process(int32_t fd, struct sockaddr_in* clientaddr){
-    char request_buffer[RCV_BUFFER_SIZE];
+    char request_buffer[RCV_BUFFER_SIZE] = {0};
     printf("accept request, fd is %d, pid is %d\n", fd, getpid());
-    int32_t read_size = recv(fd, request_buffer, RCV_BUFFER_SIZE - 1, 0);
 
+    int32_t read_size = recv_request(fd, request_buffer, RCV_BUFFER_SIZE);
     if (read_size > 0) {
         request_buffer[read_size] = '\0';
         if (strstr(request_buffer, "GET /") != NULL) {
@@ -79,6 +128,7 @@ static void process(int32_t fd, struct sockaddr_in* clientaddr){
             send_bad_request_page(fd, clientaddr);
         }
     }
+
     close(fd);
 }
 
