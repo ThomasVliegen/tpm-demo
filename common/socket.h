@@ -9,8 +9,8 @@
 
 #include <wolfssl/ssl.h>
 
+#include <sys/time.h>
 #include <stdio.h>
-
 #include <netdb.h>
 
 typedef struct SockIoCbCtx {
@@ -150,14 +150,18 @@ static inline int SetupSocketAndListen(SockIoCbCtx* sockIoCtx, word32 port)
     return 0;
 }
 
-static inline int SocketWaitClient(SockIoCbCtx* sockIoCtx)
+static inline int SocketWaitClient(SockIoCbCtx* sockIoCtx, struct sockaddr_in* clientAddr)
 {
     int connd;
-    struct sockaddr_in clientAddr;
-    XSOCKLENT          size = sizeof(clientAddr);
+    XSOCKLENT          size = sizeof(*clientAddr);
+    struct timeval timeout = {.tv_usec = 250000};
 
-    if ((connd = accept(sockIoCtx->listenFd, (struct sockaddr*)&clientAddr, &size)) == -1) {
+    if ((connd = accept(sockIoCtx->listenFd, (struct sockaddr*)clientAddr, &size)) == -1) {
         printf("ERROR: failed to accept the connection\n\n");
+        return -1;
+    }
+    if (setsockopt(connd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout)) {
+        printf("setsockopt SO_RCVTIMEO failed\n");
         return -1;
     }
     sockIoCtx->fd = connd;
