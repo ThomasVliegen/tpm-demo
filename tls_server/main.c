@@ -90,7 +90,7 @@ static void process(WOLFSSL* ssl, struct sockaddr_in* clientaddr)
     
     if (read_size > 0) {
         if (strstr(request_buffer, "GET /") != NULL) {
-            const char *content = read_file("http_server/pages/login.html");
+            const char *content = read_file("common/pages/login.html");
             if (content == NULL)
                 send_not_found_page(ssl, clientaddr);
             else
@@ -113,7 +113,7 @@ static void send_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr, const char* 
     snprintf(response_buf, sizeof(response_buf), 
             "HTTP/1.1 %s\r\n"
             "Content-Type: text/html\r\n"
-            "Connection: close\r\n"
+            // "Connection: close\r\n"
             "Content-Length: %zu\r\n"
             "\r\n"
             "%s", status_code, content_length, content);
@@ -163,7 +163,7 @@ static void handle_login(WOLFSSL* ssl, struct sockaddr_in* clientaddr, char *bod
 
     // Check credentials
     if (strcmp(username, USERNAME) == 0 && strcmp(password, PASSWORD) == 0) {
-        const char *content = read_file("http_server/pages/dashboard.html");
+        const char *content = read_file("common/pages/dashboard_secure.html");
         if (content == NULL)
             send_not_found_page(ssl, clientaddr);
         else
@@ -329,7 +329,7 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     	rc = SetupSocketAndListen(&sockIoCtx, TLS_PORT);
     	if (rc != 0) goto cleanup;
 
-        // Setup callbacks
+      // Setup callbacks
     	wolfSSL_SetIOReadCtx(ssl, &sockIoCtx);
     	wolfSSL_SetIOWriteCtx(ssl, &sockIoCtx);
       struct sockaddr_in clientaddr;
@@ -346,10 +346,10 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
           }
       } while (rc == WOLFSSL_ERROR_WANT_READ || rc == WOLFSSL_ERROR_WANT_WRITE);
 
-        if (rc != WOLFSSL_SUCCESS) goto cleanup;
+      if (rc != WOLFSSL_SUCCESS) goto cleanup;
 
-        // Process
-        process(ssl, &clientaddr);
+      // Process
+      process(ssl, &clientaddr);
 
 cleanup:
         wolfSSL_shutdown(ssl);
