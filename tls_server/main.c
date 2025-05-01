@@ -19,51 +19,94 @@
 #define PASSWORD "password123"
 
 // function declarations
-static void process(WOLFSSL* ssl);
-static void send_page(WOLFSSL* ssl, const char* page, const char* status_code);
-static void send_not_found_page(WOLFSSL* ssl);
-static void send_unauthorized_page(WOLFSSL* ssl);
-static void send_bad_request_page(WOLFSSL* ssl);
+static int32_t get_content_length(const char *headers);
+static int32_t recv_request(WOLFSSL* ssl, char *out_buffer, size_t max_size);
+static bool headers_complete(const char *buffer);
+static void log_access(const char* status_code, struct sockaddr_in* c_addr);
+static void process(WOLFSSL* ssl, struct sockaddr_in* clientaddr);
+static void send_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr, const char* page, const char* status_code);
+static void send_not_found_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr);
+static void send_unauthorized_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr);
+static void send_bad_request_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr);
 static int send_response(WOLFSSL* ssl, void* usrbuf, size_t n);
-static void handle_login(WOLFSSL* ssl, char* body);
+static void handle_login(WOLFSSL* ssl, struct sockaddr_in* clientaddr, char* body);
 static const char* read_file(const char *filename);
 
-static void process(WOLFSSL* ssl)
+static int32_t get_content_length(const char *headers) {
+    const char *cl = strstr(headers, "Content-Length:");
+    if (cl) {
+        cl += strlen("Content-Length:");
+        while (*cl == ' ') cl++; // skip spaces
+        if (*cl == '\0') return 0;
+
+        char *endptr;
+        long len = strtol(cl, &endptr, 10);
+        if (endptr == cl || len < 0) return 0; // Invalid number
+        return len;
+    }
+    return 0; 
+}
+
+static int32_t recv_request(WOLFSSL* ssl, char *out_buffer, size_t max_size)
+{
+    size_t total_received = 0;
+    size_t header_end_offset = 0;
+
+    while (!headers_complete(out_buffer)) {
+        ssize_t r = wolfSSL_read(ssl, out_buffer + total_received, max_size - total_received - 1);
+        if (r <= 0) return 0; // error, timeout or connection closed
+        total_received += r;
+        out_buffer[total_received] = '\0';
+    }
+    char *header_end = strstr(out_buffer, "\r\n\r\n");
+    if (header_end == NULL) return 0;
+    header_end_offset = header_end - out_buffer + 4;
+
+    int32_t content_length = get_content_length(out_buffer);
+    while (total_received - header_end_offset < content_length) {
+        ssize_t r = wolfSSL_read(ssl, out_buffer + total_received, max_size - total_received - 1);
+        if (r <= 0) return 0;
+        total_received += r;
+        out_buffer[total_received] = '\0';
+    }
+
+    return total_received;
+}
+
+static bool headers_complete(const char *buffer)
+{
+    return strstr(buffer, "\r\n\r\n") != NULL;
+}
+
+static void log_access(const char* status_code, struct sockaddr_in* c_addr){
+    printf("%s:%d - %s\n", inet_ntoa(c_addr->sin_addr),
+           ntohs(c_addr->sin_port), status_code);
+}
+
+static void process(WOLFSSL* ssl, struct sockaddr_in* clientaddr)
 {
     char request_buffer[RCV_BUFFER_SIZE];
-    int rc = 0;
-    do
-    {
-        rc = wolfSSL_read(ssl, request_buffer, sizeof(request_buffer));
-        if (rc < 0)
-        {
-            rc = wolfSSL_get_error(ssl, 0);
-        }
-    } while (rc == WOLFSSL_ERROR_WANT_READ);
+    int32_t read_size = recv_request(ssl, request_buffer, RCV_BUFFER_SIZE);
     
-    if (rc > 0) {
-        const int32_t request_size = rc;
-        request_buffer[request_size] = '\0';
-        printf("Read (%d): %s\n", request_size, request_buffer);
+    if (read_size > 0) {
         if (strstr(request_buffer, "GET /") != NULL) {
             const char *content = read_file("http_server/pages/login.html");
             if (content == NULL)
-                send_not_found_page(ssl);
+                send_not_found_page(ssl, clientaddr);
             else
-                send_page(ssl, content, "200 OK");
+                send_page(ssl, clientaddr, content, "200 OK");
             free((char *)content);   
         } else if (strstr(request_buffer, "POST /login") != NULL) {
-            printf("login request received\n");
             // Find the start of the body
             char *body = strstr(request_buffer, "\r\n\r\n") + 4;
-            handle_login(ssl, body);
+            handle_login(ssl, clientaddr, body);
         } else {
-            send_bad_request_page(ssl);
+            send_bad_request_page(ssl, clientaddr);
         }
     }
 }
 
-static void send_page(WOLFSSL* ssl, const char* content, const char* status_code)
+static void send_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr, const char* content, const char* status_code)
 {
     char response_buf[RSP_BUFFER_SIZE];
     size_t content_length = strlen(content);
@@ -74,28 +117,29 @@ static void send_page(WOLFSSL* ssl, const char* content, const char* status_code
             "Content-Length: %zu\r\n"
             "\r\n"
             "%s", status_code, content_length, content);
-    send_response(ssl, response_buf, sizeof(response_buf));
+    send_response(ssl, response_buf, strlen(response_buf));
+    log_access(status_code, clientaddr);
 }
 
-static void send_not_found_page(WOLFSSL* ssl)
+static void send_not_found_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr)
 {
     const char* status_code = "404 Not Found";
     const char* response_buf = "<html><body><h1>404 Not Found</h1></body></html>";
-    send_page(ssl, response_buf, status_code);
+    send_page(ssl, clientaddr, response_buf, status_code);
 }
 
-static void send_unauthorized_page(WOLFSSL* ssl)
+static void send_unauthorized_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr)
 {
     const char* status_code = "401 Unauthorized";
     const char* response_buf = "<html><body><h1>401 Unauthorized</h1></body></html>";
-    send_page(ssl, response_buf, status_code);
+    send_page(ssl, clientaddr, response_buf, status_code);
 }
 
-static void send_bad_request_page(WOLFSSL* ssl)
+static void send_bad_request_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr)
 {
     const char* status_code = "400 Bad Request";
     const char* response_buf = "<html><body><h1>400 Bad Request</h1></body></html>";
-    send_page(ssl, response_buf, status_code);
+    send_page(ssl, clientaddr, response_buf, status_code);
 }
 
 static int send_response(WOLFSSL* ssl, void* usrbuf, size_t n)
@@ -111,7 +155,7 @@ static int send_response(WOLFSSL* ssl, void* usrbuf, size_t n)
     return rc;
 }
 
-static void handle_login(WOLFSSL* ssl, char *body) {
+static void handle_login(WOLFSSL* ssl, struct sockaddr_in* clientaddr, char *body) {
     char username[128] = {0}, password[128] = {0};
 
     sscanf(body, "username=%127[^&]&password=%127s", username, password);
@@ -121,12 +165,12 @@ static void handle_login(WOLFSSL* ssl, char *body) {
     if (strcmp(username, USERNAME) == 0 && strcmp(password, PASSWORD) == 0) {
         const char *content = read_file("http_server/pages/dashboard.html");
         if (content == NULL)
-            send_not_found_page(ssl);
+            send_not_found_page(ssl, clientaddr);
         else
-            send_page(ssl, content, "200 OK");
+            send_page(ssl, clientaddr, content, "200 OK");
         free((char *)content);
     } else {
-        send_unauthorized_page(ssl);
+        send_unauthorized_page(ssl, clientaddr);
     }
 }
 
@@ -236,9 +280,6 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     wolfSSL_CTX_SetIORecv(ctx, SockIORecv);
     wolfSSL_CTX_SetIOSend(ctx, SockIOSend);
 
-    /* Server certificate validation */
-    wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, myVerify);
-
     /* Load CA Certificates */
     if (wolfSSL_CTX_load_verify_locations(ctx, "./certs/ca-ecc-cert.pem", 0) != WOLFSSL_SUCCESS)
     {
@@ -291,7 +332,8 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
         // Setup callbacks
     	wolfSSL_SetIOReadCtx(ssl, &sockIoCtx);
     	wolfSSL_SetIOWriteCtx(ssl, &sockIoCtx);
-    	rc = SocketWaitClient(&sockIoCtx);
+      struct sockaddr_in clientaddr;
+    	rc = SocketWaitClient(&sockIoCtx, &clientaddr);
     	if (rc != 0) goto cleanup;
 
       // Accept connection
@@ -307,21 +349,17 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
         if (rc != WOLFSSL_SUCCESS) goto cleanup;
 
         // Process
-        process(ssl);
+        process(ssl, &clientaddr);
 
 cleanup:
-        printf("Cleanup reached!\n");
         wolfSSL_shutdown(ssl);
         wolfSSL_free(ssl);
         CloseAndCleanupSocket(&sockIoCtx);
     }
 
 exit:
-    printf("Exit reached!\n");
     if (rc != 0)
-    {
         printf("Failure %d (0x%x): %s\n", rc, rc, wolfTPM2_GetRCString(rc));
-    }
 
 
     wolfSSL_CTX_free(ctx);
