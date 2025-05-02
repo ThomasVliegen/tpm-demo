@@ -61,39 +61,40 @@ static int32_t get_content_length(const char *headers) {
     if (cl) {
         cl += strlen("Content-Length:");
         while (*cl == ' ') cl++; // skip spaces
-        if (*cl == '\0')
-          return 0;
+        if (*cl == '\0') return 0;
 
         char *endptr;
         long len = strtol(cl, &endptr, 10);
         if (endptr == cl || len < 0) return 0; // Invalid number
+        return len;
     }
+    return 0;
 }
 
 static int32_t recv_request(int32_t fd, char *out_buffer, size_t max_size)
 {
-  size_t total_received = 0;
-  size_t header_end_offset = 0;
+    size_t total_received = 0;
+    size_t header_end_offset = 0;
 
-  while (!headers_complete(out_buffer)) {
-      ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
-      if (r <= 0) return 0; // error, timeout or connection closed
-      total_received += r;
-      out_buffer[total_received] = '\0';
-  }
-  char *header_end = strstr(out_buffer, "\r\n\r\n");
-  if (header_end == NULL) return 0;
-  header_end_offset = header_end - out_buffer + 4;
+    while (!headers_complete(out_buffer)) {
+        ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
+        if (r <= 0) return 0; // error, timeout or connection closed
+        total_received += r;
+        out_buffer[total_received] = '\0';
+    }
+    char *header_end = strstr(out_buffer, "\r\n\r\n");
+    if (header_end == NULL) return 0;
+    header_end_offset = header_end - out_buffer + 4;
 
-  int32_t content_length = get_content_length(out_buffer);
-  while (total_received - header_end_offset < content_length) {
-      ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
-      if (r <= 0) return 0;
-      total_received += r;
-      out_buffer[total_received] = '\0';
-  }
+    int32_t content_length = get_content_length(out_buffer);
+    while (total_received - header_end_offset < content_length) {
+        ssize_t r = recv(fd, out_buffer + total_received, max_size - total_received - 1, 0);
+        if (r <= 0) return 0;
+        total_received += r;
+        out_buffer[total_received] = '\0';
+    }
 
-  return total_received;
+    return total_received;
 }
 
 static bool headers_complete(const char *buffer)
@@ -108,13 +109,12 @@ static void log_access(const char* status_code, struct sockaddr_in* c_addr){
 
 static void process(int32_t fd, struct sockaddr_in* clientaddr){
     char request_buffer[RCV_BUFFER_SIZE] = {0};
-    printf("accept request, fd is %d, pid is %d\n", fd, getpid());
-
     int32_t read_size = recv_request(fd, request_buffer, RCV_BUFFER_SIZE);
+    
     if (read_size > 0) {
         request_buffer[read_size] = '\0';
         if (strstr(request_buffer, "GET /") != NULL) {
-            const char *content = read_file("http_server/pages/login.html");
+            const char *content = read_file("common/pages/login.html");
             if (content == NULL)
                 send_not_found_page(fd, clientaddr);
             else
@@ -193,7 +193,7 @@ static void handle_login(int32_t client_sock, struct sockaddr_in* clientaddr, ch
 
     // Check credentials
     if (strcmp(username, USERNAME) == 0 && strcmp(password, PASSWORD) == 0) {
-        const char *content = read_file("http_server/pages/dashboard.html");
+        const char *content = read_file("common/pages/dashboard.html");
         if (content == NULL)
             send_not_found_page(client_sock, clientaddr);
         else
