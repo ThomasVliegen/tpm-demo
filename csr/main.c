@@ -51,7 +51,6 @@ static int TpmCsrGenerate(WOLFTPM2_DEV* dev, int keyType, WOLFTPM2_KEY* key, con
         printf("%s\n", (char*)output.buffer);
     }
 
-    (void)outputPemFile;
     wolfTPM2_FreeCSR(csr);
 
     return rc;
