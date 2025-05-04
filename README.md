@@ -10,6 +10,7 @@ The [LetsTrust-TPM](https://letstrust.de) is used as Trusted Platform Module to 
 
 Some packages are used in this demo, these can be installed by running:
 ```sh
+sudo apt-get update
 sudo apt-get install vim git libtool automake tpm2-tools
 ```
 
