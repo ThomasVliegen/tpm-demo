@@ -32,6 +32,7 @@ int GetPrimaryECCKey(WOLFTPM2_DEV* pDev,
     rc = wolfTPM2_ReadPublicKey(pDev, key, sPrimaryEccKeyIndex);
 
     // If it does not exist, create it
+    printf("Loading key at index 0x%x.\n", sPrimaryEccKeyIndex);
     if (ErrorToTpmRc(rc) == TPM_RC_HANDLE)
     {
         printf("No key was found at index 0x%x. Generating a new one.\n", sPrimaryEccKeyIndex);
@@ -41,10 +42,6 @@ int GetPrimaryECCKey(WOLFTPM2_DEV* pDev,
             // Make key persistent
             rc = wolfTPM2_NVStoreKey(pDev, TPM_RH_OWNER, key, sPrimaryEccKeyIndex);
         }
-    }
-    else
-    {
-        printf("An existing key was found at index 0x%x.\n", sPrimaryEccKeyIndex);
     }
 
     if (rc != TPM_RC_SUCCESS)

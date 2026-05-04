@@ -259,16 +259,17 @@ int32_t main(int32_t argc, char** argv){
     struct timeval timeout = {.tv_usec = 250000};
 
     listenfd = open_listenfd(default_port);
-    if (listenfd > 0) {
-        printf("listen on port %d, fd is %d\n", default_port, listenfd);
-    } else {
-        perror("ERROR");
+    if (listenfd <= 0) {
+        perror("Failed to open listen file descriptor");
         exit(listenfd);
     }
+
     // Ignore SIGPIPE signal, so if browser cancels the request, it
     // won't kill the whole process.
     signal(SIGPIPE, SIG_IGN);
 
+    // Infinite loop of accepting client connections
+    printf("Server started, listening on port %d\n", default_port);
     while(1){
         connfd = accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
         setsockopt(connfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);

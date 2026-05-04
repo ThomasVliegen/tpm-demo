@@ -113,7 +113,7 @@ static void send_page(WOLFSSL* ssl, struct sockaddr_in* clientaddr, const char* 
     snprintf(response_buf, sizeof(response_buf), 
             "HTTP/1.1 %s\r\n"
             "Content-Type: text/html\r\n"
-            // "Connection: close\r\n"
+            "Connection: close\r\n"
             "Content-Length: %zu\r\n"
             "\r\n"
             "%s", status_code, content_length, content);
@@ -263,9 +263,6 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
             TPM_ECC_NIST_P256, TPM_ALG_ECDSA);
     if (rc != 0) goto exit;
 
-    rc = GetPrimaryECCKey(&dev, &eccKey, &wolfEccKey, tpmDevId, &publicTemplate);
-    if (rc != 0) goto exit;
-
     /* Setup the WOLFSSL context (factory)
      * Use highest version, allow downgrade */
     if ((ctx = wolfSSL_CTX_new(wolfTLSv1_2_server_method())) == NULL)
@@ -281,16 +278,10 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     wolfSSL_CTX_SetIOSend(ctx, SockIOSend);
 
     /* Load CA Certificates */
-    if (wolfSSL_CTX_load_verify_locations(ctx, "./certs/ca-ecc-cert.pem", 0) != WOLFSSL_SUCCESS)
-    {
-        printf("Error loading ca-ecc-cert.pem cert\n");
-        goto exit;
-    }
-
     byte der[256];
     word32 derSz = sizeof(der);
 
-    printf("Loading ECC certificate and public key\n");
+    printf("Loading server ECC certificate and public key...\n");
 
     if ((rc = wolfSSL_CTX_use_certificate_file(ctx, "./certs/server-ecc-cert.pem", WOLFSSL_FILETYPE_PEM))
             != WOLFSSL_SUCCESS)
@@ -298,6 +289,9 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
         printf("Error loading ECC client cert\n");
         goto exit;
     }
+
+    rc = GetPrimaryECCKey(&dev, &eccKey, &wolfEccKey, tpmDevId, &publicTemplate);
+    if (rc != 0) goto exit;
 
     rc = wc_EccPublicKeyToDer(&wolfEccKey, der, derSz, 1);
     if (rc < 0)
@@ -318,6 +312,7 @@ int TlsServer(void* userCtx, [[maybe_unused]] int argc, [[maybe_unused]] char *a
     }
 
     // Infinite loop of accepting client connections
+    printf("Server started, listening on port %d\n", TLS_PORT);
     while (1)
     {
     	// Create wolfSSL session
