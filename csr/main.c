@@ -16,10 +16,14 @@ static int TpmCsrGenerate(WOLFTPM2_DEV* dev, int keyType, WOLFTPM2_KEY* key, con
     WOLFTPM2_BUFFER output;
 
     WOLFTPM2_CSR* csr = wolfTPM2_NewCSR();
-    if (csr == NULL)
-    {
+    if (!csr)
         return MEMORY_E;
-    }
+
+    // Bug in wolfTPM version <3.4.0:
+    //      wolfTPM2_NewCSR sets the version to 2 (v3) when it should be set to 0 (v1) for PKCS#10 CSR as per RFC2986. 
+    //      Therefore, the version is manually set to 0 here.
+    //      see: https://github.com/wolfSSL/wolfTPM/releases/tag/v3.4.0
+    csr->req.version = 0;
 
     output.size = (int)sizeof(output.buffer);
     rc = wolfTPM2_CSR_SetSubject(dev, csr, subject);
